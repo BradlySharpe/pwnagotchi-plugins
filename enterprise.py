@@ -208,7 +208,7 @@ INDEX = """
 
 {% block meta %}
     <meta charset="utf-8">
-    <!-- <meta name="viewport" content="width=device-width, user-scalable=0" /> -->
+    <meta name="viewport" content="width=device-width, user-scalable=0" />
 {% endblock %}
 
 {% block styles %}
@@ -233,6 +233,34 @@ INDEX = """
         width:100%;
     }
 
+    table {
+        table-layout: auto;
+        width: 100%;
+    }
+
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 15px;
+      text-align: left;
+    }
+
+    table tr:nth-child(even) {
+      background-color: #eee;
+    }
+
+    table tr:nth-child(odd) {
+     background-color: #fff;
+    }
+
+    table th {
+      background-color: black;
+      color: white;
+    }
+
     @media screen and (max-width:700px) {
         
     }
@@ -246,30 +274,28 @@ INDEX = """
     <hr />
     <h4>Access Points</h4>
     <div id="content">
-        <table border="0" width="100%">
+        <table border="0" width="100%" cellspacing="0" cellpadding="0">
             <tr>
                 <th>BSSID</th>
                 <th>SSID</th>
+                <th>Ch</th>
                 <th>Enc</th>
                 <th>Cipher</th>
                 <th>Auth</th>
-                <th>Ch</th>
-                <th>Freq</th>
             </tr>
             {% for ap in access_points %}
                 <tr>
                     <td>{{ ap.mac }}</td>
                     <td>{{ ap.hostname }}</td>
+                    <td>{{ ap.channel }}</td>
                     <td>{{ ap.encryption }}</td>
                     <td>{{ ap.cipher }}</td>
                     <td>{{ ap.authentication }}</td>
-                    <td>{{ ap.channel }}</td>
-                    <td>{{ ap.frequency }}</td>
                 </tr>
             {% endfor %}
         </table>
     </div>
-    <div id="debug"></div>
+    <!--<div id="debug"></div>-->
 {% endblock %}
 
 {% block script %}
@@ -300,6 +326,7 @@ INDEX = """
           xobj.send(JSON.stringify(data));
         }
 
+        /*
         function loadJSON(url, callback) {
           var xobj = new XMLHttpRequest();
           xobj.overrideMimeType("application/json");
@@ -318,5 +345,6 @@ INDEX = """
             divDebug.innerHTML = JSON.stringify(response);
             //divDebug.appendChild(table);
         });
+        */
 {% endblock %}
 """
