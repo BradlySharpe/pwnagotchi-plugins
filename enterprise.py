@@ -139,7 +139,11 @@ class Enterprise(plugins.Plugin):
         logging.debug("[enterprise] wifi update", access_points)
 
         if access_points:
-            self.config["access_points"] = access_points
+            self.config["access_points"] = []
+
+            for ap in access_points:
+                if ap["authentication"] is not "PSK":
+                    self.config["access_points"].append(ap)
 
     def trigger(self):
         if not self.ready:
@@ -176,7 +180,11 @@ class Enterprise(plugins.Plugin):
 
         if request.method == "GET":
             if path == "/" or not path:
-                return render_template_string(INDEX)
+                return render_template_string(
+                    INDEX,
+                    title="Enterprise",
+                    access_points=self.config["access_points"]
+                )
             elif path == "get-config":
                 return json.dumps(self.config) #, default=serializer)
             else:
@@ -193,14 +201,14 @@ class Enterprise(plugins.Plugin):
 
 INDEX = """
 {% extends "base.html" %}
-{% set active_page = "plugins" %}
+{% set active_page = "enterprise" %}
 {% block title %}
-    Enterprise
+    {{ title }}
 {% endblock %}
 
 {% block meta %}
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=0" />
+    <!-- <meta name="viewport" content="width=device-width, user-scalable=0" /> -->
 {% endblock %}
 
 {% block styles %}
@@ -237,7 +245,31 @@ INDEX = """
     <button id="btnUpdate" type="button" onclick="updateTask()">Update Task</button>
     <hr />
     <h4>Access Points</h4>
-    <div id="content"></div>
+    <div id="content">
+        <table border="0" width="100%">
+            <tr>
+                <th>BSSID</th>
+                <th>SSID</th>
+                <th>Enc</th>
+                <th>Cipher</th>
+                <th>Auth</th>
+                <th>Ch</th>
+                <th>Freq</th>
+            </tr>
+            {% for ap in access_points %}
+                <tr>
+                    <td>{{ ap.mac }}</td>
+                    <td>{{ ap.hostname }}</td>
+                    <td>{{ ap.encryption }}</td>
+                    <td>{{ ap.cipher }}</td>
+                    <td>{{ ap.authentication }}</td>
+                    <td>{{ ap.channel }}</td>
+                    <td>{{ ap.frequency }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
+    <div id="debug"></div>
 {% endblock %}
 
 {% block script %}
@@ -281,10 +313,10 @@ INDEX = """
         }
 
         loadJSON("enterprise/get-config", function(response) {
-            var divContent = document.getElementById("content");
-            divContent.innerHTML = "";
-            divContent.innerHTML = JSON.stringify(response);
-            //divContent.appendChild(table);
+            var divDebug = document.getElementById("debug");
+            divDebug.innerHTML = "";
+            divDebug.innerHTML = JSON.stringify(response);
+            //divDebug.appendChild(table);
         });
 {% endblock %}
 """
