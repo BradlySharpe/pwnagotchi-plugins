@@ -216,7 +216,7 @@ INDEX = """
 <style>
     #btnUpdate {
         width: 90%;
-        margin: 0 5%;
+        margin: 5px 5% 0;
         background-color: #0061b0;
         border: none;
         color: white;
@@ -231,6 +231,7 @@ INDEX = """
     #content {
         padding: 5px;
         width:100%;
+        overflow-x: scroll;
     }
 
     table {
@@ -268,11 +269,8 @@ INDEX = """
 {% endblock %}
 
 {% block content %}
-    <div id="divTop">
-    </div>
     <button id="btnUpdate" type="button" onclick="updateTask()">Update Task</button>
     <hr />
-    <h4>Access Points</h4>
     <div id="content">
         <table border="0" width="100%" cellspacing="0" cellpadding="0">
             <tr>
