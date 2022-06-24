@@ -133,13 +133,13 @@ class Enterprise(plugins.Plugin):
         self.ready = True
         logging.info("[enterprise] unit is ready")
 
-    # called when the agent refreshed its access points list
-    def on_wifi_update(self, agent, access_points):
-        if not self.ready:
-            return
-
+    # called when the agent refreshed an unfiltered access point list
+    # this list contains all access points that were detected BEFORE filtering
+    def on_unfiltered_ap_list(self, agent, access_points):
         logging.debug("[enterprise] wifi update", access_points)
-        self.access_points = access_points
+
+        if access_points:
+            self.config["access_points"] = access_points
 
     def trigger(self):
         if not self.ready:
@@ -206,24 +206,9 @@ INDEX = """
 {% block styles %}
 {{ super() }}
 <style>
-    /*
-    #divTop {
-        position: -webkit-sticky;
-        position: sticky;
-        top: 0px;
-        width: 100%;
-        font-size: 16px;
-        padding: 5px;
-        border: 1px solid #ddd;
-        margin-bottom: 5px;
-    }
-    */
-
-    #btnSave {
-        position: -webkit-sticky;
-        position: sticky;
-        bottom: 0px;
-        width: 100%;
+    #btnUpdate {
+        width: 90%;
+        margin: 0 5%;
         background-color: #0061b0;
         border: none;
         color: white;
@@ -233,23 +218,11 @@ INDEX = """
         display: inline-block;
         font-size: 16px;
         cursor: pointer;
-        float: right;
     }
 
-    #divTop {
-        display: table;
-        width: 100%;
-    }
-    #divTop > * {
-        display: table-cell;
-    }
-    /*
-    #divTop > span {
-        width: 1%;
-    }
-    */
-    #divTop > input {
-        width: 100%;
+    #content {
+        padding: 5px;
+        width:100%;
     }
 
     @media screen and (max-width:700px) {
@@ -261,14 +234,14 @@ INDEX = """
 {% block content %}
     <div id="divTop">
     </div>
-    <button id="btnSave" type="button" onclick="saveConfig()">Save and restart</button>
+    <button id="btnUpdate" type="button" onclick="updateTask()">Update Task</button>
     <hr />
     <h4>Access Points</h4>
     <div id="content"></div>
 {% endblock %}
 
 {% block script %}
-        function saveConfig(){
+        function updateTask(){
             var json = {};
             sendJSON("enterprise/update-task", json, function(response) {
                 if (response) {
@@ -310,7 +283,7 @@ INDEX = """
         loadJSON("enterprise/get-config", function(response) {
             var divContent = document.getElementById("content");
             divContent.innerHTML = "";
-            divContent.innerHTML = response;
+            divContent.innerHTML = JSON.stringify(response);
             //divContent.appendChild(table);
         });
 {% endblock %}
