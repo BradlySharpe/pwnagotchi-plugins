@@ -136,14 +136,11 @@ class Enterprise(plugins.Plugin):
     # called when the agent refreshed an unfiltered access point list
     # this list contains all access points that were detected BEFORE filtering
     def on_unfiltered_ap_list(self, agent, access_points):
-        logging.debug("[enterprise] wifi update: %s" % json.dumps(access_points))
-
         if access_points:
             self.config["access_points"] = []
 
             for ap in access_points:
-                logging.debug("[enterprise] loop {0}, {1}, {2}".format(ap["authentication"], ap, access_points[ap]))
-                if ap["authentication"] is not "PSK":
+                if (ap["encryption"] != "OPEN") and (ap["authentication"] != "PSK"):
                     self.config["access_points"].append(ap)
 
     def trigger(self):
@@ -229,6 +226,18 @@ INDEX = """
         cursor: pointer;
     }
 
+    #btnSelect {
+        background-color: #0061b0;
+        border: none;
+        color: white;
+        padding: 15px 32px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
     #content {
         width:100%;
         max-width:100%;
@@ -271,11 +280,28 @@ INDEX = """
 {% endblock %}
 
 {% block content %}
+    <label for="bssid">BSSID:</label>
+    <input type="text" id="bssid" name="bssid" value="" placeholder="00:11:22:33:44:55" />
+    <label for="ssid">SSID:</label>
+    <input type="text" id="ssid" name="ssid" value="" placeholder="SSID Name" />
+    <label for="channel">Channel:</label>
+    <input type="number" id="channel" name="channel" value="" />
+    <label for="enc">Encryption:</label>
+    <input type="text" id="enc" name="enc" value="" placeholder="WPA2" />
+    <label>Cipher:</label>
+    <input type="radio" id="ccmp" name="cipher" value="CCMP">
+    <label for="ccmp">CCMP</label><br>
+    <input type="radio" id="tkip" name="cipher" value="TKIP">
+    <label for="tkip">TKIP</label><br>
+    <input type="radio" id="both" name="cipher" value="TKIP + CMMP">
+    <label for="both">TKIP + CMMP</label>
+
     <button id="btnUpdate" type="button" onclick="updateTask()">Update Task</button>
     <hr />
     <div id="content">
         <table border="0" width="100%" cellspacing="0" cellpadding="0">
             <tr>
+                <th></th>
                 <th>BSSID</th>
                 <th>SSID</th>
                 <th>Ch</th>
@@ -285,6 +311,13 @@ INDEX = """
             </tr>
             {% for ap in access_points %}
                 <tr>
+                    <td>
+                        <button 
+                            class="btnSelect" 
+                            type="button" 
+                            onclick="set({{ ap.mac }}, {{ ap.hostname }}, {{ ap.channel }}, {{ ap.encryption }}, {{ ap.cipher }})"
+                        >Select</button>
+                    </td>
                     <td>{{ ap.mac }}</td>
                     <td>{{ ap.hostname }}</td>
                     <td>{{ ap.channel }}</td>
@@ -299,6 +332,28 @@ INDEX = """
 {% endblock %}
 
 {% block script %}
+
+        function getAndSet(id, value) {
+            el = document.getElementById(id);
+            if (el) el.value = value;
+        }
+
+        function set(mac, hostname, channel, enc, cipher) {
+            getAndSet("bssid", mac);
+            getAndSet("ssid", hostname);
+            getAndSet("channel", channel);
+            getAndSet("enc", enc);
+            
+            el = null;
+            if (cipher.toUpperCase() === 'CCMP')
+                el = document.getElementById('ccmp');
+            else if (cipher.toUpperCase() === 'TKIP')
+                el = document.getElementById('tkip');
+            
+            if (el)
+                el.checked = true;
+        }
+
         function updateTask(){
             var json = {};
             sendJSON("enterprise/update-task", json, function(response) {
