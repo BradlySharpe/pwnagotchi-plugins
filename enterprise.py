@@ -163,7 +163,7 @@ def generate_certificates(config, password):
 
 class Enterprise(plugins.Plugin):
     __author__ = '5461464+BradlySharpe@users.noreply.github.com'
-    __version__ = '0.0.2'
+    __version__ = '0.0.3'
     __name__ = 'enterprise'
     __license__ = 'GPL3'
     __description__ = 'This plugin will attempt to obtain credentials from enterprise networks when bored and networks are available.'
@@ -283,6 +283,9 @@ class Enterprise(plugins.Plugin):
                 except Exception as ex:
                     logging.error(ex)
                     return "config error", 500
+            if path == "trigger-task":
+                self.trigger(None)
+                return "success"
         abort(404)
 
 INDEX = """
@@ -400,6 +403,7 @@ INDEX = """
         <input type="text" id="commonName" name="commonName" value="" placeholder="Common Name" />
     </div>
     <button id="btnUpdate" type="button" onclick="updateTask()">Update Task</button>
+    <button id="btnTrigger" type="button" onclick="trigger()">Trigger Task</button>
     <hr />
     <div id="content">
         <table border="0" width="100%" cellspacing="0" cellpadding="0">
@@ -493,6 +497,18 @@ INDEX = """
                 if (response) {
                     if (response.status == "200") {
                         alert("Task updated");
+                    } else {
+                        alert("Error while updating the task (err-code: " + response.status + ")");
+                    }
+                }
+            });
+        }
+
+        function triggerTask() {
+            sendJSON("enterprise/trigger-task", {}, function(response) {
+                if (response) {
+                    if (response.status == "200") {
+                        alert("Task triggered");
                     } else {
                         alert("Error while updating the task (err-code: " + response.status + ")");
                     }
