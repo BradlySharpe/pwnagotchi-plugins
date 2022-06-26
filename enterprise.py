@@ -163,7 +163,7 @@ def generate_certificates(config, password):
 
 class Enterprise(plugins.Plugin):
     __author__ = '5461464+BradlySharpe@users.noreply.github.com'
-    __version__ = '0.0.3'
+    __version__ = '0.0.4'
     __name__ = 'enterprise'
     __license__ = 'GPL3'
     __description__ = 'This plugin will attempt to obtain credentials from enterprise networks when bored and networks are available.'
@@ -203,26 +203,39 @@ class Enterprise(plugins.Plugin):
                     self.config["access_points"].append(ap)
 
     def trigger(self, agent):
-        if not self.ready:
-            return
+        try:
+            if not self.ready:
+                logging.info("[enterprise] trigger called but not ready")
+                return
 
-        if not self.config["enabled"]:
-            return
+            if not self.config["enabled"]:
+                logging.info("[enterprise] trigger called but not enabled")
+                return
 
-        interface = self.options["interface"]
-        privateKeyPassword="whatever" # default password in configuration
+            interface = self.options["interface"]
+            logging.info("[enterprise] interface set")
+            privateKeyPassword="whatever" # default password in configuration
 
-        self.rebooting = True 
+            self.rebooting = True 
 
-        update_hostapd_config(interface, self.config, privateKeyPassword)
-        generate_certificates(self.config, privateKeyPassword)
+            logging.info("[enterprise] Updating config")
+            update_hostapd_config(interface, self.config, privateKeyPassword)
 
-        add_task({
-            "timeout": self.options["duration"],
-            "commands": [
-                "hostapd-wpe /etc/hostapd-wpe/hostapd-wpe.conf"
-            ]
-        })
+            logging.info("[enterprise] Generating certs")
+            generate_certificates(self.config, privateKeyPassword)
+
+            logging.info("[enterprise] Adding Task")
+            add_task({
+                "timeout": self.options["duration"],
+                "commands": [
+                    "hostapd-wpe /etc/hostapd-wpe/hostapd-wpe.conf"
+                ]
+            })
+
+            logging.info("[enterprise] Finished triggering task")
+        except Exception as ex:
+            logging.error(ex)
+
         
     # called when the status is set to bored
     def on_bored(self, agent):
@@ -504,7 +517,7 @@ INDEX = """
             });
         }
 
-        function triggerTask() {
+        function trigger() {
             sendJSON("enterprise/trigger-task", {}, function(response) {
                 if (response) {
                     if (response.status == "200") {
