@@ -288,14 +288,15 @@ INDEX = """
     <input type="number" id="channel" name="channel" value="" />
     <label for="enc">Encryption:</label>
     <input type="text" id="enc" name="enc" value="" placeholder="WPA2" />
-    <label>Cipher:</label>
-    <input type="radio" id="ccmp" name="cipher" value="CCMP">
-    <label for="ccmp">CCMP</label><br>
-    <input type="radio" id="tkip" name="cipher" value="TKIP">
-    <label for="tkip">TKIP</label><br>
-    <input type="radio" id="both" name="cipher" value="TKIP + CMMP">
-    <label for="both">TKIP + CMMP</label>
-
+    <fieldset data-role="controlgroup">
+        <legend>Cipher:</legend>
+        <input type="radio" name="ccmp" id="ccmp" value="CCMP">
+        <label for="ccmp">CCMP</label>
+        <input type="radio" name="tkip" id="tkip" value="TKIP">
+        <label for="tkip">TKIP</label>
+        <input type="radio" name="both" id="both" value="TKIP CCMP">
+        <label for="both">TKIP + CCMP</label>
+    </fieldset>
     <button id="btnUpdate" type="button" onclick="updateTask()">Update Task</button>
     <hr />
     <div id="content">
@@ -315,7 +316,13 @@ INDEX = """
                         <button 
                             class="btnSelect" 
                             type="button" 
-                            onclick="set({{ ap.mac }}, {{ ap.hostname }}, {{ ap.channel }}, {{ ap.encryption }}, {{ ap.cipher }})"
+                            onclick="set(
+                                '{{ ap.mac }}', 
+                                '{{ ap.hostname }}', 
+                                '{{ ap.channel }}', 
+                                '{{ ap.encryption }}', 
+                                '{{ ap.cipher }}'
+                            )"
                         >Select</button>
                     </td>
                     <td>{{ ap.mac }}</td>
@@ -351,7 +358,7 @@ INDEX = """
                 el = document.getElementById('tkip');
             
             if (el)
-                el.checked = true;
+                el.click();
         }
 
         function updateTask(){
