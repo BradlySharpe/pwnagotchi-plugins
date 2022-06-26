@@ -9,6 +9,8 @@ from pwnagotchi import reboot
 from flask import abort
 from flask import render_template_string
 
+DIRECTORY_HOSTAPD = "/etc/hostapd-wpe"
+
 def systemctl(command, unit=None):
     if unit:
         os.system("/bin/systemctl %s %s" % (command, unit))
@@ -30,36 +32,36 @@ def systemd_dropin(name, content):
 def create_service(task_service_name):
     # here we create the service which runs the tasks
     with open('/etc/systemd/system/%s' % task_service_name, 'wt') as task_service:
-        task_service.write("""
-        [Unit]
-        Description=Executes the tasks of the pwnagotchi enterprise plugin
-        After=pwnagotchi.service bettercap.service
-
-        [Service]
-        Type=oneshot
-        RemainAfterExit=yes
-        ExecStart=-/usr/local/bin/enterprise.sh
-        ExecStart=-/bin/rm /etc/systemd/system/%s
-        ExecStart=-/bin/rm /usr/local/bin/enterprise.sh
-
-        [Install]
-        WantedBy=multi-user.target
-        """ % (task_service_name))
+        task_service.write("\n".join(
+            "[Unit]",
+            "Description=Executes the tasks of the pwnagotchi enterprise plugin",
+            "After=pwnagotchi.service bettercap.service",
+            "",
+            "[Service]",
+            "Type=oneshot",
+            "RemainAfterExit=yes",
+            "ExecStart=-/usr/local/bin/enterprise.sh",
+            "ExecStart=-/bin/rm /etc/systemd/system/%s".format(task_service_name),
+            "ExecStart=-/bin/rm /usr/local/bin/enterprise.sh",
+            "",
+            "[Install]",
+            "WantedBy=multi-user.target"
+        ))
 
 def create_reboot_timer(timeout):
     with open('/etc/systemd/system/enterprise-reboot.timer', 'wt') as reboot_timer:
-        reboot_timer.write("""
-        [Unit]
-        Description=Reboot when time is up
-        ConditionPathExists=/root/.enterprise
-
-        [Timer]
-        OnBootSec=%sm
-        Unit=reboot.target
-
-        [Install]
-        WantedBy=timers.target
-        """ % timeout)
+        reboot_timer.write("\n".join(
+            "[Unit]",
+            "Description=Reboot when time is up",
+            "ConditionPathExists=/root/.enterprise",
+            "",
+            "[Timer]",
+            "OnBootSec=%sm".format(timeout),
+            "Unit=reboot.target"
+            "",
+            "[Install]",
+            "WantedBy=timers.target"
+        ))
 
 def create_command(script_path, commands):
     with open(script_path, 'wt') as script_file:
@@ -86,18 +88,21 @@ def add_task(options):
     open('/root/.enterprise', 'a').close()
 
     # add condition
-    systemd_dropin("pwnagotchi.service", """
-    [Unit]
-    ConditionPathExists=!/root/.enterprise""")
+    systemd_dropin("pwnagotchi.service", "\n".join(
+        "[Unit]",
+        "ConditionPathExists=!/root/.enterprise"
+    ))
 
-    systemd_dropin("bettercap.service", """
-    [Unit]
-    ConditionPathExists=!/root/.enterprise""")
+    systemd_dropin("bettercap.service", "\n".join(
+        "[Unit]",
+        "ConditionPathExists=!/root/.enterprise"
+    ))
 
-    systemd_dropin(task_service_name, """
-    [Service]
-    ExecStart=-/bin/rm /root/.enterprise
-    ExecStart=-/bin/rm /etc/systemd/system/enterprise-reboot.timer""")
+    systemd_dropin(task_service_name, "\n".join(
+        "[Service]",
+        "ExecStart=-/bin/rm /root/.enterprise",
+        "ExecStart=-/bin/rm /etc/systemd/system/enterprise-reboot.timer"
+    ))
 
     create_reboot_timer(options['timeout'])
 
@@ -107,54 +112,54 @@ def add_task(options):
     reboot()
 
 def update_hostapd_config(interface, config, password):
-    confFilepath = "/etc/hostapd-wpe/hostapd-wpe.conf"
+    confFilepath = "{0}/hostapd-wpe.conf".format(DIRECTORY_HOSTAPD)
 
     # Update hostapd-wpe configuration
-    os.system("sed -i 's/^\(private_key_passwd=\).*$/\1{1}/' {0}".format(confFilepath, password))
-    os.system("sed -i 's/^\(wpa_key_mgmt=\).*$/\1{1}/' {0}".format(confFilepath, "WPA-EAP"))
-    os.system("sed -i 's/^\(interface=\).*$/\1{1}/' {0}".format(confFilepath, interface))
-    os.system("sed -i 's/^\(ssid=\).*$/\1{1}/' {0}".format(confFilepath, config["ssid"]))
-    os.system("sed -i 's/^\(channel=\).*$/\1{1}/' {0}".format(confFilepath, config["channel"]))
-    os.system("sed -i 's/^\(wpa_pairwise=\).*$/\1{1}/' {0}".format(confFilepath, config["cipher"]))
-    os.system("sed -i 's/^\(rsn_pairwise=\).*$/\1{1}/' {0}".format(confFilepath, config["cipher"]))
+    os.system("sed -i 's/^\(private_key_passwd=\).*$/\\1{1}/' {0}".format(confFilepath, password))
+    os.system("sed -i 's/^\(wpa_key_mgmt=\).*$/\\1{1}/' {0}".format(confFilepath, "WPA-EAP"))
+    os.system("sed -i 's/^\(interface=\).*$/\\1{1}/' {0}".format(confFilepath, interface))
+    os.system("sed -i 's/^\(ssid=\).*$/\\1{1}/' {0}".format(confFilepath, config["ssid"]))
+    os.system("sed -i 's/^\(channel=\).*$/\\1{1}/' {0}".format(confFilepath, config["channel"]))
+    os.system("sed -i 's/^\(wpa_pairwise=\).*$/\\1{1}/' {0}".format(confFilepath, config["cipher"]))
+    os.system("sed -i 's/^\(rsn_pairwise=\).*$/\\1{1}/' {0}".format(confFilepath, config["cipher"]))
     mode = "a"
     if int(config["channel"]) <= 14:
         mode = "g"
-    os.system("sed -i 's/^\(hw_mode=\).*$/\1{1}/' {0}".format(confFilepath, mode))
+    os.system("sed -i 's/^\(hw_mode=\).*$/\\1{1}/' {0}".format(confFilepath, mode))
     # Get last digit(s) from enc method
-    os.system("sed -i 's/^\(wpa=\).*$/\1{1}/' {0}".format(confFilepath, re.sub('.*?([0-9]*)$',r'\1', config["enc"])))
+    os.system("sed -i 's/^\(wpa=\).*$/\\1{1}/' {0}".format(confFilepath, re.sub('.*?([0-9]*)$',r'\1', config["enc"])))
     # May need to find commented out line also if first run
-    os.system("sed -i 's/^#*\(bssid=\).*$/\1{1}/' {0}".format(confFilepath, config["bssid"]))
+    os.system("sed -i 's/^#*\(bssid=\).*$/\\1{1}/' {0}".format(confFilepath, config["bssid"]))
     # May need to find commented out line also if first run
-    os.system("sed -i 's/^#*\(country_code=\).*$/\1{1}/' {0}".format(confFilepath, config["certificate"]["country"]))
+    os.system("sed -i 's/^#*\(country_code=\).*$/\\1{1}/' {0}".format(confFilepath, config["certificate"]["country"]))
 
 def generate_certificates(config, password):
-    directory = "/etc/hostapd-wpe"
-    caFilepath = "{0}/certs/ca.cnf".format(directory)
-    serverFilepath = "{0}/certs/server.cnf".format(directory)
+    
+    caFilepath = "{0}/certs/ca.cnf".format(DIRECTORY_HOSTAPD)
+    serverFilepath = "{0}/certs/server.cnf".format(DIRECTORY_HOSTAPD)
 
     # Update CA Certificate
-    os.system("sed -i '/[req]/,/^[/ s/^\(input_password=\).*$/\1{1}/' {0}".format(caFilepath, password))
-    os.system("sed -i '/[req]/,/^[/ s/^\(output_password=\).*$/\1{1}/' {0}".format(caFilepath, password))
-    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(countryName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["country"]))
-    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(stateOrProvinceName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["state"]))
-    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(localityName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["city"]))
-    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(organizationName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["organization"]))
-    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(emailAddress\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["email"]))
-    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(commonName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["commonName"]))
+    os.system("sed -i '/\[req\]/,/^\[/ s/^\(input_password=\).*$/\\1{1}/' {0}".format(caFilepath, password))
+    os.system("sed -i '/\[req\]/,/^\[/ s/^\(output_password=\).*$/\\1{1}/' {0}".format(caFilepath, password))
+    os.system("sed -i '/\[certificate_authority\]/,/^\[/ s/^\(countryName\s*=\).*$/\\1 {1}/' {0}".format(caFilepath, config["certificate"]["country"]))
+    os.system("sed -i '/\[certificate_authority\]/,/^\[/ s/^\(stateOrProvinceName\s*=\).*$/\\1 {1}/' {0}".format(caFilepath, config["certificate"]["state"]))
+    os.system("sed -i '/\[certificate_authority\]/,/^\[/ s/^\(localityName\s*=\).*$/\\1 {1}/' {0}".format(caFilepath, config["certificate"]["city"]))
+    os.system("sed -i '/\[certificate_authority\]/,/^\[/ s/^\(organizationName\s*=\).*$/\\1 {1}/' {0}".format(caFilepath, config["certificate"]["organisation"]))
+    os.system("sed -i '/\[certificate_authority\]/,/^\[/ s/^\(emailAddress\s*=\).*$/\\1 {1}/' {0}".format(caFilepath, config["certificate"]["email"]))
+    os.system("sed -i '/\[certificate_authority\]/,/^\[/ s/^\(commonName\s*=\).*$/\\1 {1}/' {0}".format(caFilepath, config["certificate"]["commonName"]))
 
     # Update Server Certificate
-    os.system("sed -i '/[req]/,/^[/ s/^\(input_password=\).*$/\1{1}/' {0}".format(serverFilepath, password))
-    os.system("sed -i '/[req]/,/^[/ s/^\(output_password=\).*$/\1{1}/' {0}".format(serverFilepath, password))
-    os.system("sed -i '/[server]/,/^[/ s/^\(countryName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["country"]))
-    os.system("sed -i '/[server]/,/^[/ s/^\(stateOrProvinceName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["state"]))
-    os.system("sed -i '/[server]/,/^[/ s/^\(localityName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["city"]))
-    os.system("sed -i '/[server]/,/^[/ s/^\(organizationName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["organization"]))
-    os.system("sed -i '/[server]/,/^[/ s/^\(emailAddress\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["email"]))
-    os.system("sed -i '/[server]/,/^[/ s/^\(commonName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["commonName"]))
+    os.system("sed -i '/\[req\]/,/^\[/ s/^\(input_password=\).*$/\\1{1}/' {0}".format(serverFilepath, password))
+    os.system("sed -i '/\[req\]/,/^\[/ s/^\(output_password=\).*$/\\1{1}/' {0}".format(serverFilepath, password))
+    os.system("sed -i '/\[server\]/,/^\[/ s/^\(countryName\s*=\).*$/\\1 {1}/' {0}".format(serverFilepath, config["certificate"]["country"]))
+    os.system("sed -i '/\[server\]/,/^\[/ s/^\(stateOrProvinceName\s*=\).*$/\\1 {1}/' {0}".format(serverFilepath, config["certificate"]["state"]))
+    os.system("sed -i '/\[server\]/,/^\[/ s/^\(localityName\s*=\).*$/\\1 {1}/' {0}".format(serverFilepath, config["certificate"]["city"]))
+    os.system("sed -i '/\[server\]/,/^\[/ s/^\(organizationName\s*=\).*$/\\1 {1}/' {0}".format(serverFilepath, config["certificate"]["organisation"]))
+    os.system("sed -i '/\[server\]/,/^\[/ s/^\(emailAddress\s*=\).*$/\\1 {1}/' {0}".format(serverFilepath, config["certificate"]["email"]))
+    os.system("sed -i '/\[server\]/,/^\[/ s/^\(commonName\s*=\).*$/\\1 {1}/' {0}".format(serverFilepath, config["certificate"]["commonName"]))
 
     # Generate certificates
-    os.system("$(cd {0}/certs && make ca && make server)".format(directory))
+    os.system("$(cd {0}/certs && make ca && make server)".format(DIRECTORY_HOSTAPD))
 
 # def serializer(obj):
 #     if isinstance(obj, set):
@@ -163,7 +168,7 @@ def generate_certificates(config, password):
 
 class Enterprise(plugins.Plugin):
     __author__ = '5461464+BradlySharpe@users.noreply.github.com'
-    __version__ = '0.0.4'
+    __version__ = '0.0.5'
     __name__ = 'enterprise'
     __license__ = 'GPL3'
     __description__ = 'This plugin will attempt to obtain credentials from enterprise networks when bored and networks are available.'
@@ -254,9 +259,6 @@ class Enterprise(plugins.Plugin):
             ui.set('line2', "SSID: %s" % self.config["ssid"])
 
     def on_webhook(self, path, request):
-        """
-        Serves the current configuration
-        """
         if not self.ready:
             return "Plugin not ready"
 
@@ -296,14 +298,16 @@ class Enterprise(plugins.Plugin):
                 except Exception as ex:
                     logging.error(ex)
                     return "config error", 500
-            if path == "trigger-task":
+            elif path == "trigger-task":
                 self.trigger(None)
                 return "success"
+            else:
+                abort(404)
         abort(404)
 
 INDEX = """
 {% extends "base.html" %}
-{% set active_page = "enterprise" %}
+{% set active_page = "plugins" %}
 {% block title %}
     {{ title }}
 {% endblock %}
