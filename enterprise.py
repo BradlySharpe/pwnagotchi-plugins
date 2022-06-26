@@ -136,12 +136,13 @@ class Enterprise(plugins.Plugin):
     # called when the agent refreshed an unfiltered access point list
     # this list contains all access points that were detected BEFORE filtering
     def on_unfiltered_ap_list(self, agent, access_points):
-        logging.debug("[enterprise] wifi update", access_points)
+        logging.debug("[enterprise] wifi update: %s" % json.dumps(access_points))
 
         if access_points:
             self.config["access_points"] = []
 
             for ap in access_points:
+                logging.debug("[enterprise] loop {0}, {1}, {2}".format(ap["authentication"], ap, access_points[ap]))
                 if ap["authentication"] is not "PSK":
                     self.config["access_points"].append(ap)
 
@@ -229,12 +230,13 @@ INDEX = """
     }
 
     #content {
-        padding: 5px;
         width:100%;
+        max-width:100%;
         overflow-x: scroll;
     }
 
     table {
+        margin: 5px;
         table-layout: auto;
         width: 100%;
     }
