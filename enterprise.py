@@ -190,6 +190,7 @@ class Enterprise(plugins.Plugin):
         elif request.method == "POST":
             if path == "update-task":
                 try:
+                    logging.info("[enterprise] config received: {0}".format(json.dumps(request.get_json())))
                     # Update configuration here
                     return "success"
                 except Exception as ex:
